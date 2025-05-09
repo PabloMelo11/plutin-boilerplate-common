@@ -1,12 +1,12 @@
-import { DependencyContainer, FastifyAdapter } from 'plutin'
+import { FastifyAdapter } from 'plutin'
 
-import CreateBookController from '@infra/controllers/create-book/create-book-controller'
 import { env } from '@infra/env'
-
-import '@infra/container'
+import { registerRoutes } from '@infra/routes'
 
 const http = new FastifyAdapter(env)
 
-http.registerRoute(DependencyContainer.resolve(CreateBookController))
+await registerRoutes(http)
 
 http.startServer(env.PORT)
+
+export { http }
