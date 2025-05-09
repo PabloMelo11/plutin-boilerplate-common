@@ -5,7 +5,7 @@ import { registerRoutes } from '@infra/routes'
 
 const http = new FastifyAdapter(env)
 
-await registerRoutes(http)
+registerRoutes(http)
 
 http.startServer(env.PORT)
 
