@@ -1,4 +1,4 @@
-import { AggregateRoot, Optional, UniqueEntityId, type Replace } from 'plutin'
+import { AggregateRoot, Optional, Replace, UniqueEntityId } from 'plutin'
 
 type BookProps = {
   title: string
