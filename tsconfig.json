@@ -4,9 +4,9 @@
     "module": "ESNext",
     "moduleResolution": "node",
     "declaration": true,
-    "baseUrl": "./src",
+    "baseUrl": "./",
     "outDir": "dist",
-    "rootDir": "src",
+    "rootDir": "./",
     "strict": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
@@ -18,11 +18,12 @@
     "isolatedModules": false,
     "resolveJsonModule": true,
     "paths": {
-      "@domain/*": ["domain/*"],
-      "@application/*": ["application/*"],
-      "@infra/*": ["infra/*"],
+      "@domain/*": ["./src/domain/*"],
+      "@application/*": ["./src/application/*"],
+      "@infra/*": ["./src/infra/*"],
+      "@test/*": ["./test/*"]
     }
   },
-  "include": ["src"],
+  "include": ["./src"],
   "exclude": ["dist", "node_modules"]
 }
