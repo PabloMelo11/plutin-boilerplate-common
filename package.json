@@ -8,6 +8,9 @@
   "keywords": [],
   "author": "Pablo",
   "license": "ISC",
+  "engines": {
+    "node": ">=22.14.0"
+  },
   "scripts": {
     "dev": "tsx watch src/main.ts",
     "prod": "node dist/main.cjs",
