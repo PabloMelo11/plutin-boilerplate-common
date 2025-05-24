@@ -1,0 +1,32 @@
+name: Run E2E Tests
+
+on: [pull_request]
+
+jobs:
+  run-unit-tests:
+    name: Run E2E Tests
+    runs-on: ubuntu-latest
+
+    services:
+      database:
+        image: mongo:latest
+        ports:
+          - 27017:27017
+        env:
+          MONGO_INITDB_ROOT_USERNAME: docker
+          MONGO_INITDB_ROOT_PASSWORD: docker
+          MONGO_INITDB_DATABASE: test-e2e-mongo
+
+    steps:
+      - uses: actions/checkout@v3
+      
+      - uses: actions/setup-node@v3
+        with:
+          node-version: 22
+          cache: 'npm'
+      
+      - run: npm ci
+
+      - run: npm run test:e2e
+        env:
+          DATABASE_URL: "mongodb://docker:docker@localhost:27017/test-e2e-mongo?authSource=admin"
