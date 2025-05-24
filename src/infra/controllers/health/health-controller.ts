@@ -10,6 +10,7 @@ export default class HealthController extends BaseController {
   }
 
   async handle(): Promise<Response> {
+    // implement health check DB
     return this.success({
       ok: true,
     })

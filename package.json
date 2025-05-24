@@ -19,12 +19,9 @@
     "eslint:fix": "npx eslint --fix src/**/*.ts",
     "prettier:format": "prettier --write src/**/*.ts",
     "lint-staged": "lint-staged",
-    "test": "vitest run --reporter=verbose",
-    "test:unit": "vitest run --reporter=verbose --dir src/domain",
-    "test:integration": "vitest run --reporter=verbose --dir src/application/use-cases",
-    "test:e2e": "vitest run --reporter=verbose --dir src/infra/controllers",
-    "test:watch": "vitest",
-    "test:coverage": "vitest run --coverage"
+    "test": "vitest --config vitest.tests.config.ts run --reporter=verbose",
+    "test:e2e": "vitest --config vitest.e2e.config.ts run --reporter=verbose",
+    "test:coverage": "vitest --config vitest.tests.config.ts run --coverage"
   },
   "lint-staged": {
     "*.ts": [

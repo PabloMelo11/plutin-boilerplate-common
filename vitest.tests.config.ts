@@ -3,10 +3,11 @@ import { defineConfig } from 'vitest/config'
 
 export default defineConfig({
   test: {
+    name: 'tests',
     root: './',
     globals: true,
     environment: 'node',
-    exclude: ['node_modules', 'dist'],
+    exclude: ['node_modules', 'dist', './src/infra/controllers/**/*.spec.ts'],
     include: ['**/*.spec.ts'],
     coverage: {
       provider: 'v8',

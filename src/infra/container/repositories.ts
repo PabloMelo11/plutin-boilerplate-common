@@ -1,6 +1,6 @@
 import { DependencyContainer } from 'plutin'
 
-import BooksRepositoryInMemory from '@infra/repositories/in-memory/books-repository-in-memory'
+import BooksRepositoryInMemory from '@infra/database/in-memory/books-repository-in-memory'
 
 DependencyContainer.register('BooksRepository', BooksRepositoryInMemory, {
   singleton: true,
