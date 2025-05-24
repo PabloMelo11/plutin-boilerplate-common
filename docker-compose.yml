@@ -1,0 +1,52 @@
+version: '3'
+
+services:
+  mongo:
+    image: mongo:latest
+    container_name: pluto_mongo
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: docker
+      MONGO_INITDB_ROOT_PASSWORD: docker
+      MONGO_INITDB_DATABASE: pluto-mongo
+    ports:
+      - 27017:27017
+    volumes:
+      - pluto_mongo_data:/data/db
+  postgres:
+    image: bitnami/postgresql
+    container_name: pluto_postgres
+    ports:
+      - 5432:5432
+    environment:
+      - POSTGRESQL_USERNAME=docker
+      - POSTGRESQL_PASSWORD=docker
+      - POSTGRESQL_DATABASE=pluto
+    volumes:
+      - pluto_postgres_data:/var/lib/postgresql/data
+  queue:
+    image: 'rabbitmq:3.8-management-alpine'
+    container_name: pluto_queue
+    hostname: rabbitmq
+    ports:
+      - '15672:15672'
+      - '5672:5672'
+    volumes:
+      - 'pluto_queue:/var/lib/rabbitmq/mnesia'
+    environment:
+      - RABBITMQ_DEFAULT_USER=admin
+      - RABBITMQ_DEFAULT_PASS=admin
+  cache:
+    image: 'bitnami/redis:latest'
+    container_name: pluto_cache
+    ports:
+      - '6379:6379'
+    volumes:
+      - 'pluto_cache:/bitnami/redis/data'
+    environment:
+      - REDIS_PASSWORD=redis
+
+volumes:
+  pluto_mongo_data:
+  pluto_postgres_data:
+  pluto_queue:
+  pluto_cache:
