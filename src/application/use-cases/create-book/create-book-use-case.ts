@@ -1,4 +1,4 @@
-import { Inject } from 'plutin'
+import { type ILogger, Inject } from 'plutin'
 
 import type IBooksRepository from '@application/repositories/books-repository'
 import Book from '@domain/book'
@@ -7,7 +7,8 @@ import type { CreateBookInput, CreateBookOutput } from './create-book-dto'
 
 export default class CreateBookUseCase {
   constructor(
-    @Inject('BooksRepository') private booksRepository: IBooksRepository
+    @Inject('BooksRepository') private booksRepository: IBooksRepository,
+    @Inject('Logger') private logger: ILogger
   ) {}
 
   async execute(input: CreateBookInput): Promise<CreateBookOutput> {
@@ -18,6 +19,12 @@ export default class CreateBookUseCase {
     })
 
     await this.booksRepository.create(book)
+
+    this.logger.info({
+      message: 'Book criado sucesso!',
+      data: { book_title: book.title },
+      correlationId: book.id.toString(),
+    })
 
     return {
       id: book.id.toString(),
