@@ -1,5 +1,22 @@
+### logs
+
 - padronizar se os logs vao ter camelCase, ou snake_case ...
-- ter log de request-in e request-out
+- remover logs desnecessarios ao iniciar a aplicacao
+- nao conseguimos adicionar mais informacoes na raiz do log?
+- testar errors
+- verificar se logs de erro deveriam ser no fastify ou no controllerBase
+
+---
+
+### traces
+
+- verificar TEMPO
+  - nao esta gerando os traces
+  - os traces precisam estar relacionados com os logs
+
+---
+
+### metrics
 
 [ ] verificar metricas
 -> adicionar metricas de erros http (4XX 5XX)
@@ -8,8 +25,16 @@
 [ ] montar graficos de p50, p95, p99
 -> do que o mercado mais utiliza (http_time_response...)
 
+---
+
+### alerts
+
 [ ] como criar alertas atraves de metricas
 -> Grafana OnCall
+
+---
+
+### random
 
 [ ] como fazer o shotdown do servico corretamente
 -> se tiver algo executando no event loop, a maquina deve esperar a execucao?!

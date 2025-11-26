@@ -1,4 +1,4 @@
-import { GlobalErrorHandler } from 'plutin'
+import { DependencyContainer, GlobalErrorHandler } from 'plutin'
 
 import { env } from '@infra/env'
 import { registerRoutes } from '@infra/routes'
@@ -6,9 +6,11 @@ import { registerRoutes } from '@infra/routes'
 import { FastifyAdapter } from './lib/fastify-adapter'
 import { initializeOtel, shutdownOtel } from './lib/otel'
 
+import '@infra/container'
+
 initializeOtel()
 
-const http = new FastifyAdapter()
+const http = DependencyContainer.resolve(FastifyAdapter)
 
 async function main() {
   const globalErrorHandler = new GlobalErrorHandler(env)

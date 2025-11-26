@@ -3,7 +3,7 @@ import { SpanStatusCode, trace } from '@opentelemetry/api'
 import fastify, { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify'
 import { randomUUID } from 'node:crypto'
 import qs from 'qs'
-import type { BaseController, IHttp } from 'plutin'
+import { type BaseController, type IHttp, Inject } from 'plutin'
 
 import { env } from '@infra/env'
 
@@ -21,7 +21,7 @@ type Request = {
 export class FastifyAdapter implements IHttp {
   readonly instance: FastifyInstance
 
-  constructor() {
+  constructor(@Inject('Logger') private logger: any) {
     this.instance = fastify({
       bodyLimit: 10 * 1024 * 1024,
       querystringParser: (str) => qs.parse(str),
@@ -48,13 +48,17 @@ export class FastifyAdapter implements IHttp {
           http_client_ip: request.ip,
         })
 
-        // this.logger.info({
-        //   msg: 'HTTP Request received',
-        //   includeHttp: true,
-        //   data: {
-        //     request_id: request.id,
-        //   },
-        // })
+        this.logger.info({
+          msg: 'http-in',
+          data: {
+            request_id: request.id,
+            http_url: request.url,
+            http_method: request.method,
+            Http_headers: request?.headers,
+            http_params: request?.params,
+            http_query: request?.query,
+          },
+        })
       }
     })
 
@@ -64,18 +68,17 @@ export class FastifyAdapter implements IHttp {
         const responseTime = reply.elapsedTime || 0
 
         span.setAttributes({
-          'http.status_code': reply.statusCode,
+          http_status_code: reply.statusCode,
         })
 
-        // this.logger.info({
-        //   msg: 'HTTP Response sent',
-        //   includeHttp: true,
-        //   data: {
-        //     request_id: request.id,
-        //     response_time_ms: Math.round(responseTime),
-        //     status_code: reply.statusCode,
-        //   },
-        // })
+        this.logger.info({
+          msg: 'http-out',
+          data: {
+            request_id: request.id,
+            response_time_ms: Math.round(responseTime),
+            status_code: reply.statusCode,
+          },
+        })
       }
     })
   }
