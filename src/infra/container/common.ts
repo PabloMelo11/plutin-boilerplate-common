@@ -2,7 +2,8 @@ import { DependencyContainer, NotificationFactory } from 'plutin'
 
 import { env } from '@infra/env'
 
-import { Logger } from '../../lib/logger'
+// import { Logger } from '../../lib/logger'
+import { PinoOtelLogger } from '../../lib/pino-logger'
 
 DependencyContainer.registerValue('DiscordConfig', {
   url: env.DISCORD_WEBHOOK_URL,
@@ -14,11 +15,7 @@ DependencyContainer.registerValue('SentryConfig', {
   environment: env.ENVIRONMENT,
 })
 
-DependencyContainer.register(
-  'Logger',
-  Logger.define(env, { development: 'discord' }),
-  { singleton: true }
-)
+DependencyContainer.register('Logger', PinoOtelLogger, { singleton: true })
 
 DependencyContainer.register(
   'IErrorNotifier',

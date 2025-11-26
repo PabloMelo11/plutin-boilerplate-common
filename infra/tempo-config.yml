@@ -1,0 +1,59 @@
+server:
+  http_listen_port: 3200
+
+# Distributor - Recebe traces via OTLP
+distributor:
+  receivers:
+    otlp:
+      protocols:
+        grpc:
+          endpoint: 0.0.0.0:4317
+        http:
+          endpoint: 0.0.0.0:4318
+
+# Ingester - Armazena traces
+ingester:
+  max_block_duration: 5m
+  trace_idle_period: 10s
+  max_block_bytes: 1_000_000
+
+# Compactor - Gerencia retenção
+compactor:
+  compaction:
+    block_retention: 24h
+    compacted_block_retention: 1h
+
+# Storage - Local (para desenvolvimento)
+storage:
+  trace:
+    backend: local
+    wal:
+      path: /var/tempo/wal
+    local:
+      path: /var/tempo/blocks
+
+# Query Frontend
+query_frontend:
+  search:
+    max_duration: 0s
+  trace_by_id:
+    query_timeout: 10s
+
+# Overrides
+overrides:
+  defaults:
+    metrics_generator:
+      processors: [service-graphs, span-metrics]
+      max_active_series: 10000
+
+# Metrics Generator (opcional - gera métricas a partir de traces)
+metrics_generator:
+  registry:
+    external_labels:
+      source: tempo
+      environment: development
+  storage:
+    path: /var/tempo/generator/wal
+    remote_write:
+      - url: http://prometheus:9090/api/v1/write
+        send_exemplars: true

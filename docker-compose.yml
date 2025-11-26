@@ -1,52 +1,130 @@
-version: '3'
-
 services:
-  mongo:
-    image: mongo:latest
-    container_name: pluto_mongo
-    environment:
-      MONGO_INITDB_ROOT_USERNAME: docker
-      MONGO_INITDB_ROOT_PASSWORD: docker
-      MONGO_INITDB_DATABASE: pluto-mongo
+  # Loki - Logs
+  loki:
+    image: grafana/loki:2.9.3
+    container_name: loki
     ports:
-      - 27017:27017
+      - '3100:3100'
+    command: -config.file=/etc/loki/local-config.yaml
     volumes:
-      - pluto_mongo_data:/data/db
-  postgres:
-    image: bitnami/postgresql
-    container_name: pluto_postgres
+      - ./infra/loki-config.yaml:/etc/loki/local-config.yaml:ro
+      - loki-data:/loki
+    networks:
+      - otel-network
+    healthcheck:
+      test:
+        [
+          'CMD',
+          'wget',
+          '--no-verbose',
+          '--tries=1',
+          '--spider',
+          'http://localhost:3100/ready',
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    restart: unless-stopped
+
+  # Tempo - Traces
+  tempo:
+    image: grafana/tempo:2.3.1
+    container_name: tempo
+    command: ['-config.file=/etc/tempo.yaml']
+    volumes:
+      - ./infra/tempo-config.yml:/etc/tempo.yaml:ro
+      - tempo-data:/var/tempo
     ports:
-      - 5432:5432
-    environment:
-      - POSTGRESQL_USERNAME=docker
-      - POSTGRESQL_PASSWORD=docker
-      - POSTGRESQL_DATABASE=pluto
+      - '3200:3200' # Tempo HTTP/UI
+      - '4317:4317' # OTLP gRPC (interno)
+      - '4318:4318' # OTLP HTTP (interno)
+    networks:
+      - otel-network
+    healthcheck:
+      test:
+        [
+          'CMD',
+          'wget',
+          '--no-verbose',
+          '--tries=1',
+          '--spider',
+          'http://localhost:3200/ready',
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    restart: unless-stopped
+
+  # OpenTelemetry Collector - PONTO DE ENTRADA PRINCIPAL
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:0.91.0
+    container_name: otel-collector
+    command: ['--config=/etc/otel-collector-config.yml']
     volumes:
-      - pluto_postgres_data:/var/lib/postgresql/data
-  queue:
-    image: 'rabbitmq:3.8-management-alpine'
-    container_name: pluto_queue
-    hostname: rabbitmq
+      - ./infra/otel-collector-config.yml:/etc/otel-collector-config.yml:ro
     ports:
-      - '15672:15672'
-      - '5672:5672'
+      - '14317:4317' # OTLP gRPC - SUA APLICAÇÃO USA localhost:14317
+      - '14318:4318' # OTLP HTTP - SUA APLICAÇÃO USA localhost:14318
+      - '8888:8888' # Metrics do próprio collector
+      - '8889:8889' # Prometheus exporter
+      - '13133:13133' # Health check
+    networks:
+      - otel-network
+    depends_on:
+      - loki
+      - tempo
+    restart: unless-stopped
+
+  # Prometheus - Metrics
+  prometheus:
+    image: prom/prometheus:v2.48.1
+    container_name: prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/usr/share/prometheus/console_libraries'
+      - '--web.console.templates=/usr/share/prometheus/consoles'
     volumes:
-      - 'pluto_queue:/var/lib/rabbitmq/mnesia'
-    environment:
-      - RABBITMQ_DEFAULT_USER=admin
-      - RABBITMQ_DEFAULT_PASS=admin
-  cache:
-    image: 'bitnami/redis:latest'
-    container_name: pluto_cache
+      - ./infra/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
     ports:
-      - '6379:6379'
-    volumes:
-      - 'pluto_cache:/bitnami/redis/data'
+      - '9090:9090'
+    networks:
+      - otel-network
+    depends_on:
+      - otel-collector
+    restart: unless-stopped
+
+  # Grafana - Dashboards
+  grafana:
+    image: grafana/grafana:10.2.3
+    container_name: grafana
     environment:
-      - REDIS_PASSWORD=redis
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_USERS_ALLOW_SIGN_UP=false
+      - GF_SERVER_HTTP_PORT=3000
+      - GF_FEATURE_TOGGLES_ENABLE=traceqlEditor
+    volumes:
+      - ./infra/grafana-datasources.yml:/etc/grafana/provisioning/datasources/datasources.yml:ro
+      - grafana-data:/var/lib/grafana
+    ports:
+      - '3001:3000'
+    networks:
+      - otel-network
+    depends_on:
+      - prometheus
+      - loki
+      - tempo
+    restart: unless-stopped
+
+networks:
+  otel-network:
+    driver: bridge
 
 volumes:
-  pluto_mongo_data:
-  pluto_postgres_data:
-  pluto_queue:
-  pluto_cache:
+  loki-data:
+  tempo-data:
+  prometheus-data:
+  grafana-data:
