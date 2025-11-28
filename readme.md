@@ -1,13 +1,3 @@
-### logs
-
-- padronizar se os logs vao ter camelCase, ou snake_case ...
-- remover logs desnecessarios ao iniciar a aplicacao
-- nao conseguimos adicionar mais informacoes na raiz do log?
-- testar errors
-- verificar se logs de erro deveriam ser no fastify ou no controllerBase
-
----
-
 ### traces
 
 - verificar TEMPO
@@ -36,13 +26,22 @@
 
 ### random
 
+[ ] criar classe do otel para ter de forma mais estruturada os metodos
+-> adicionar atributes
+-> injetar no fastify
+[ ] entender melhor sampler
+[ ] fazer queries no Loki para ter de exemplos
+[ ] conseguir utilizar o decorator @Span()
+
 [ ] como fazer o shotdown do servico corretamente
 -> se tiver algo executando no event loop, a maquina deve esperar a execucao?!
+
 [ ] colocar na lib tudo que foi desenvolvido
-[ ] conseguir utilizar o decorator @Span()
 -> controller
 -> use case
 -> repositorio
+
+[ ] GlobalErrorHandler ter shutdown
 
 ---
 

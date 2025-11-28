@@ -1,4 +1,3 @@
-import { context, trace } from '@opentelemetry/api'
 import { logs, SeverityNumber } from '@opentelemetry/api-logs'
 import pino from 'pino'
 
@@ -51,36 +50,18 @@ export class PinoOtelLogger {
   ) {
     const { msg, data, error } = params
 
-    const activeContext = context.active()
-    const span = trace.getSpan(activeContext)
-    const spanContext = span?.spanContext()
-
-    const traceId = spanContext?.traceId
-    const spanId = spanContext?.spanId
-    const traceFlags = spanContext?.traceFlags
-
-    const attributes: Record<string, any> = {
-      service_name: 'plutin-boilerplate-common',
-      service_environment: env.ENVIRONMENT,
-    }
+    const attributes: Record<string, any> = {}
 
     if (data) {
       attributes['data'] = { ...data }
     }
 
-    // if ((span as any).attributes) {
-    //   attributes['data'] = {
-    //     ...attributes['data'],
-    //     ...(span as any).attributes,
-    //   }
-    // }
-
     if (error) {
       attributes['error'] = {
-        error_type: error.name,
-        error_message: error.message,
-        error_stack: error.stack,
-        error_code: (error as any).code,
+        errorType: error.name,
+        errorMessage: error.message,
+        errorStack: error.stack,
+        errorCode: (error as any).code,
       }
     }
 
@@ -90,11 +71,6 @@ export class PinoOtelLogger {
       body: msg,
       timestamp: new Date(),
       attributes,
-      ...(spanContext && {
-        traceId: traceId,
-        spanId: spanId,
-        traceFlags: traceFlags,
-      }),
     })
   }
 

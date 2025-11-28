@@ -21,39 +21,28 @@ import {
 
 import { env } from '@infra/env'
 
-// Configurar diagnósticos
-if (env.ENVIRONMENT === 'development') {
-  diag.setLogger(new DiagConsoleLogger(), DiagLogLevel.DEBUG)
-} else {
+if (env.ENVIRONMENT !== 'development') {
   diag.setLogger(new DiagConsoleLogger(), DiagLogLevel.WARN)
 }
 
-// Resource (metadados do serviço)
 const resource = new Resource({
   [ATTR_SERVICE_NAME]: 'plutin-boilerplate-common',
   [ATTR_SERVICE_VERSION]: '1.0.0',
   [SEMRESATTRS_DEPLOYMENT_ENVIRONMENT]: env.ENVIRONMENT,
 })
 
-// ============= LOGS =============
-
-// Exporter para Logs (OTLP)
 const otlpLogExporter = new OTLPLogExporter({
   url: 'http://localhost:14318/v1/logs',
   headers: {},
 })
 
-// Console exporter para debug (apenas em dev)
 const consoleLogExporter = new ConsoleLogRecordExporter()
 
-// Logger Provider
 const loggerProvider = new LoggerProvider({
   resource,
 })
 
-// Adicionar processors
 if (env.ENVIRONMENT === 'development') {
-  // Em dev: envia para OTLP E console
   loggerProvider.addLogRecordProcessor(
     new BatchLogRecordProcessor(otlpLogExporter, {
       maxQueueSize: 100,
@@ -65,7 +54,6 @@ if (env.ENVIRONMENT === 'development') {
     new BatchLogRecordProcessor(consoleLogExporter)
   )
 } else {
-  // Em prod: apenas OTLP
   loggerProvider.addLogRecordProcessor(
     new BatchLogRecordProcessor(otlpLogExporter, {
       maxQueueSize: 1000,
@@ -75,21 +63,15 @@ if (env.ENVIRONMENT === 'development') {
   )
 }
 
-// Registrar globalmente
 logs.setGlobalLoggerProvider(loggerProvider)
-
-// ============= TRACES =============
 
 const traceExporter = new OTLPTraceExporter({
   url: 'http://localhost:14318/v1/traces',
 })
 
-// Sample rate diferente por ambiente
 const sampler = new TraceIdRatioBasedSampler(
-  env.ENVIRONMENT === 'development' ? 1.0 : 0.01 // 100% em dev, 1% em prod
+  env.ENVIRONMENT === 'development' ? 1.0 : 0.01
 )
-
-// ============= SDK =============
 
 export const sdk = new NodeSDK({
   resource,
@@ -108,12 +90,9 @@ export const sdk = new NodeSDK({
   sampler,
 })
 
-// ============= FUNÇÕES DE CONTROLE =============
-
 export function initializeOtel() {
   try {
     sdk.start()
-    console.log('✅ OpenTelemetry SDK inicializado com sucesso')
   } catch (error) {
     console.error('❌ Erro ao inicializar OpenTelemetry SDK:', error)
     throw error
@@ -121,17 +100,13 @@ export function initializeOtel() {
 }
 
 export async function shutdownOtel() {
-  console.log('🔄 Desligando OpenTelemetry SDK...')
   try {
-    // Força o flush de logs pendentes
     await loggerProvider.forceFlush()
     await loggerProvider.shutdown()
     await sdk.shutdown()
-    console.log('✅ OpenTelemetry SDK desligado com sucesso')
   } catch (error) {
     console.error('❌ Erro ao desligar OpenTelemetry SDK:', error)
   }
 }
 
-// Export do logger provider para uso direto se necessário
 export { loggerProvider }

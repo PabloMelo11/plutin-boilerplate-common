@@ -3,8 +3,9 @@ import type { baseEnvSchema } from 'plutin'
 
 import { ConsoleLogger } from './console'
 import { DiscordLogger } from './discord'
+import { PinoOtelLogger } from './pino-logger'
 
-type OptionsNotifications = 'console' | 'discord'
+type OptionsNotifications = 'console' | 'discord' | 'otel'
 
 type Props = {
   development?: OptionsNotifications
@@ -18,7 +19,7 @@ export class Logger {
       test: 'console',
       development: this.defineProvider(definitions?.development || 'console'),
       staging: this.defineProvider(definitions?.staging || 'discord'),
-      production: this.defineProvider(definitions?.production || 'discord'),
+      production: this.defineProvider(definitions?.production || 'otel'),
     }
 
     return definition[env.ENVIRONMENT]
@@ -30,6 +31,8 @@ export class Logger {
         return ConsoleLogger
       case 'discord':
         return DiscordLogger
+      case 'otel':
+        return PinoOtelLogger
       default:
         return ConsoleLogger
     }

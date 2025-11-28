@@ -1,5 +1,5 @@
 import { MessageBuilder, Webhook } from 'discord-webhook-node'
-import { ILogger, Inject } from 'plutin'
+import { Inject } from 'plutin'
 
 import { env } from '@infra/env'
 
@@ -17,7 +17,7 @@ type LogParams = {
   correlationId?: string
 }
 
-export class DiscordLogger implements ILogger {
+export class DiscordLogger {
   private webhook: Webhook
 
   constructor(

@@ -22,7 +22,17 @@ export default class CreateBookUseCase {
 
     this.logger.info({
       msg: 'Book criado sucesso!',
-      data: { book_title: book.title, correlationId: book.id.toString() },
+      data: { bookTitle: book.title, correlationId: book.id.toString() },
+    })
+
+    this.logger.warn({
+      msg: 'Warn ao criar book',
+      data: { correlationId: book.id.toString() },
+    })
+
+    this.logger.debug({
+      msg: 'Debug ao criar book',
+      data: { bookTitle: book.title, correlationId: book.id.toString() },
     })
 
     return {
