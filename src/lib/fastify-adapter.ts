@@ -119,6 +119,7 @@ export class FastifyAdapter implements IHttp {
           if (activeSpan) {
             activeSpan.setStatus({ code: SpanStatusCode.OK })
             activeSpan.setAttribute('httpStatusCode', output.code || 200)
+
             activeSpan.setAttribute(
               'responseCode',
               output.data?.code || 'no-code'
@@ -138,6 +139,7 @@ export class FastifyAdapter implements IHttp {
             })
 
             activeSpan.recordException(err)
+
             activeSpan.setAttributes({
               error: true,
               errorType: err.name,
@@ -174,11 +176,15 @@ export class FastifyAdapter implements IHttp {
 
   async startServer(port: number): Promise<void> {
     await this.instance.listen({ port })
-    this.logger.info(`Server listening on port ${port}`)
+    this.logger.info({
+      msg: `Server listening on port ${port}`,
+    })
   }
 
   async closeServer() {
-    this.logger.info('Server closing...')
+    this.logger.info({
+      msg: 'Server closing...',
+    })
     await this.instance.close()
   }
 }
