@@ -5,6 +5,20 @@ import Book from '@domain/book'
 
 import type { CreateBookInput, CreateBookOutput } from './create-book-dto'
 
+// class ApplicationError extends Error {
+//   props: any
+
+//   constructor(message: string) {
+//     super(message)
+//     this.props = {
+//       code: 400,
+//       errorCode: 'ERR002',
+//       message,
+//       occurredAt: new Date(),
+//     }
+//   }
+// }
+
 export default class CreateBookUseCase {
   constructor(
     @Inject('BooksRepository') private booksRepository: IBooksRepository,
@@ -17,6 +31,8 @@ export default class CreateBookUseCase {
       title: input.title,
       content: input.content,
     })
+
+    // throw new ApplicationError('Error to insert book in use case')
 
     await this.booksRepository.create(book)
 

@@ -15,7 +15,6 @@ processors:
     check_interval: 1s
     limit_mib: 512
   
-  # Adiciona informações de resource
   resource:
     attributes:
       - key: service.name
@@ -25,7 +24,6 @@ processors:
         action: upsert
         from_attribute: service.environment
 
-  # Extrai trace_id e span_id para attributes
   attributes:
     actions:
       - key: trace_id
@@ -36,22 +34,18 @@ processors:
         from_context: span_id
 
 exporters:
-  # Loki para logs
   loki:
     endpoint: http://loki:3100/loki/api/v1/push
 
-  # OTLP para Tempo (traces) - ÚNICO BACKEND DE TRACES
   otlp/tempo:
     endpoint: tempo:4317
     tls:
       insecure: true
 
-  # Prometheus para métricas
   prometheus:
     endpoint: 0.0.0.0:8889
     namespace: app
     
-  # Debug
   debug:
     verbosity: detailed
     sampling_initial: 5
@@ -65,19 +59,14 @@ service:
   extensions: [health_check]
   
   pipelines:
-    # Traces: OTLP -> Tempo
     traces:
       receivers: [otlp]
       processors: [memory_limiter, batch]
       exporters: [otlp/tempo, debug]
-    
-    # Metrics: OTLP -> Prometheus
     metrics:
       receivers: [otlp]
-      processors: [memory_limiter, batch]
+      processors: [batch]
       exporters: [prometheus, debug]
-    
-    # Logs: OTLP -> Loki
     logs:
       receivers: [otlp]
       processors: [memory_limiter, resource, attributes, batch]

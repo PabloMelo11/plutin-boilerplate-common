@@ -7,12 +7,8 @@ import { type BaseController, type IHttp, Inject } from 'plutin'
 
 import { env } from '@infra/env'
 
+import type { MetricsManager } from './metric'
 import { validateControllerMetadata } from './validate-controller-metadata'
-
-enum HttpFlow {
-  IN = 'http-in',
-  OUT = 'http-out',
-}
 
 type AnyObject = Record<string, any>
 
@@ -26,7 +22,19 @@ type Request = {
 export class FastifyAdapter implements IHttp {
   readonly instance: FastifyInstance
 
-  constructor(@Inject('Logger') private logger: any) {
+  private getNormalizedRoute(request: FastifyRequest): string {
+    // Use routerPath if available (normalized route), otherwise fallback to routeOptions.url or url
+    return (
+      (request as any).routerPath ||
+      request.routeOptions?.url ||
+      request.url.split('?')[0] // Remove query string
+    )
+  }
+
+  constructor(
+    @Inject('Logger') private logger: any,
+    @Inject('Metrics') private metrics: MetricsManager
+  ) {
     this.instance = fastify({
       bodyLimit: 10 * 1024 * 1024,
       querystringParser: (str) => qs.parse(str),
@@ -53,8 +61,8 @@ export class FastifyAdapter implements IHttp {
         })
 
         this.logger.info({
+          msg: 'http-in',
           data: {
-            flow: HttpFlow.IN,
             requestId: request.id,
             httpUrl: request.url,
             httpMethod: request.method,
@@ -67,6 +75,8 @@ export class FastifyAdapter implements IHttp {
     })
 
     this.instance.addHook('onResponse', async (request, reply) => {
+      const route = this.getNormalizedRoute(request)
+
       const span = trace.getActiveSpan()
 
       if (span) {
@@ -77,14 +87,21 @@ export class FastifyAdapter implements IHttp {
         })
 
         this.logger.info({
+          msg: 'http-out',
           data: {
-            flow: HttpFlow.OUT,
             requestId: request.id,
-            httpRoute: request.originalUrl,
+            httpRoute: route,
             httpMethod: request.method,
             responseTimeMs: Math.round(responseTime),
             statusCode: reply.statusCode,
           },
+        })
+
+        this.metrics.recordHttpRequest({
+          method: request.method,
+          route,
+          statusCode: reply.statusCode,
+          durationSeconds: responseTime / 1000,
         })
       }
     })

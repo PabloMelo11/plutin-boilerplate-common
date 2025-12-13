@@ -3,6 +3,7 @@ import { diag, DiagConsoleLogger, DiagLogLevel } from '@opentelemetry/api'
 import { logs } from '@opentelemetry/api-logs'
 import { getNodeAutoInstrumentations } from '@opentelemetry/auto-instrumentations-node'
 import { OTLPLogExporter } from '@opentelemetry/exporter-logs-otlp-http'
+import { OTLPMetricExporter } from '@opentelemetry/exporter-metrics-otlp-http'
 import { OTLPTraceExporter } from '@opentelemetry/exporter-trace-otlp-http'
 import { HttpInstrumentation } from '@opentelemetry/instrumentation-http'
 import { Resource } from '@opentelemetry/resources'
@@ -11,6 +12,7 @@ import {
   ConsoleLogRecordExporter,
   LoggerProvider,
 } from '@opentelemetry/sdk-logs'
+import { PeriodicExportingMetricReader } from '@opentelemetry/sdk-metrics'
 import { NodeSDK } from '@opentelemetry/sdk-node'
 import { TraceIdRatioBasedSampler } from '@opentelemetry/sdk-trace-node'
 import {
@@ -73,8 +75,20 @@ const sampler = new TraceIdRatioBasedSampler(
   env.ENVIRONMENT === 'development' ? 1.0 : 0.01
 )
 
+const metricExporter = new OTLPMetricExporter({
+  url: 'http://localhost:14318/v1/metrics',
+  // compression: CompressionAlgorithm.GZIP,
+})
+
+const metricReader = new PeriodicExportingMetricReader({
+  exporter: metricExporter,
+  exportIntervalMillis: 5000,
+  exportTimeoutMillis: 5000,
+})
+
 export const sdk = new NodeSDK({
   resource,
+  metricReader,
   traceExporter,
   instrumentations: [
     getNodeAutoInstrumentations({

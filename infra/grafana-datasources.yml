@@ -7,7 +7,7 @@ datasources:
     access: proxy
     url: http://loki:3100
     uid: loki
-    isDefault: true
+    isDefault: false
     jsonData:
       maxLines: 1000
       derivedFields:
@@ -47,12 +47,16 @@ datasources:
 
   # Prometheus - Metrics
   - name: Prometheus
+    version: 1
     type: prometheus
     access: proxy
     url: http://prometheus:9090
     uid: prometheus
-    isDefault: false
+    isDefault: true
+    basicAuth: false
+    editable: false
     jsonData:
+      timeInterval: 10s
       httpMethod: POST
       exemplarTraceIdDestinations:
         - name: trace_id

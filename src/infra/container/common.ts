@@ -1,3 +1,4 @@
+import { MetricsManager } from 'src/lib/metric'
 import { DependencyContainer, NotificationFactory } from 'plutin'
 
 import { env } from '@infra/env'
@@ -16,6 +17,8 @@ DependencyContainer.registerValue('SentryConfig', {
 })
 
 DependencyContainer.register('Logger', PinoOtelLogger, { singleton: true })
+
+DependencyContainer.register('Metrics', MetricsManager, { singleton: true })
 
 DependencyContainer.register(
   'IErrorNotifier',

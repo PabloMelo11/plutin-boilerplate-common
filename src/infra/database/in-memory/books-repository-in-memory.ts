@@ -11,6 +11,12 @@ export default class BooksRepositoryInMemory implements IBooksRepository {
   async create(book: Book): Promise<void> {
     this.books.push(book)
 
+    await new Promise((resolve) => {
+      return setTimeout(() => {
+        resolve(true)
+      }, 300)
+    })
+
     this.logger.info({
       msg: 'Insert book in database',
       data: { correlationId: book.id.toString() },
