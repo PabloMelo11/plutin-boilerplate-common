@@ -1,13 +1,11 @@
-import { ILogger } from 'plutin'
-
 type LogParams = {
-  message: string
+  msg: string
   data?: Record<string, any>
   error?: Error | unknown
   correlationId?: string
 }
 
-export class ConsoleLogger implements ILogger {
+export class ConsoleLogger {
   info(params: LogParams): void {
     console.info(params)
   }

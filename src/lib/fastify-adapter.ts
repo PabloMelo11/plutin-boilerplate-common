@@ -22,15 +22,6 @@ type Request = {
 export class FastifyAdapter implements IHttp {
   readonly instance: FastifyInstance
 
-  private getNormalizedRoute(request: FastifyRequest): string {
-    // Use routerPath if available (normalized route), otherwise fallback to routeOptions.url or url
-    return (
-      (request as any).routerPath ||
-      request.routeOptions?.url ||
-      request.url.split('?')[0] // Remove query string
-    )
-  }
-
   constructor(
     @Inject('Logger') private logger: any,
     @Inject('Metrics') private metrics: MetricsManager
@@ -48,6 +39,7 @@ export class FastifyAdapter implements IHttp {
 
     this.instance.addHook('onRequest', async (request) => {
       const span = trace.getActiveSpan()
+
       if (span) {
         span.setAttributes({
           httpMethod: request.method,
@@ -76,7 +68,6 @@ export class FastifyAdapter implements IHttp {
 
     this.instance.addHook('onResponse', async (request, reply) => {
       const route = this.getNormalizedRoute(request)
-
       const span = trace.getActiveSpan()
 
       if (span) {
@@ -97,12 +88,25 @@ export class FastifyAdapter implements IHttp {
           },
         })
 
+        const responseSizeBytes = reply.getHeader('content-length')
+          ? parseInt(reply.getHeader('content-length') as string, 10)
+          : undefined
+
         this.metrics.recordHttpRequest({
           method: request.method,
           route,
           statusCode: reply.statusCode,
           durationSeconds: responseTime / 1000,
+          responseSizeBytes,
         })
+
+        if (responseSizeBytes) {
+          this.metrics.recordHttpRequestBytes(responseSizeBytes, {
+            method: request.method,
+            route,
+            statusCode: reply.statusCode,
+          })
+        }
       }
     })
   }
@@ -203,5 +207,13 @@ export class FastifyAdapter implements IHttp {
       msg: 'Server closing...',
     })
     await this.instance.close()
+  }
+
+  private getNormalizedRoute(request: FastifyRequest): string {
+    return (
+      (request as any).routerPath ||
+      request.routeOptions?.url ||
+      request.url.split('?')[0]
+    )
   }
 }

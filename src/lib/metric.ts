@@ -58,6 +58,59 @@ export class MetricsManager {
     unit: '1',
   })
 
+  private dbTransactionsTotal = this.meter.createCounter(
+    'db_transactions_total',
+    {
+      description: 'Total de transações no banco de dados',
+      unit: '1',
+    }
+  )
+
+  private dbTransactionDuration = this.meter.createHistogram(
+    'db_transaction_duration_seconds',
+    {
+      description: 'Duração das transações no banco de dados',
+      unit: 's',
+    }
+  )
+
+  private dbDeadlocksTotal = this.meter.createCounter('db_deadlocks_total', {
+    description: 'Total de deadlocks detectados no banco de dados',
+    unit: '1',
+  })
+
+  private httpRequestBytesTotal = this.meter.createCounter(
+    'http_request_bytes_total',
+    {
+      description: 'Total de bytes transferidos em requisições HTTP',
+      unit: 'By',
+    }
+  )
+
+  private processingDuration = this.meter.createHistogram(
+    'processing_duration_seconds',
+    {
+      description: 'Duração de operações de processamento interno',
+      unit: 's',
+    }
+  )
+
+  private processingErrors = this.meter.createCounter(
+    'processing_errors_total',
+    {
+      description: 'Total de erros em operações de processamento',
+      unit: '1',
+    }
+  )
+
+  private httpClientRequestsTotal = this.meter.createCounter(
+    'http_client_requests_total',
+    {
+      description: 'Total de requisições HTTP client realizadas',
+      unit: '1',
+    }
+  )
+
   private httpClientRequestDuration = this.meter.createHistogram(
     'http_client_request_duration_seconds',
     {
@@ -203,15 +256,144 @@ export class MetricsManager {
 
   recordDbQueryError(params: {
     operation: string
-    table: string
+    repository: string
     errorMessage: string
   }) {
-    const { operation, table, errorMessage } = params
+    if (!this.isValidDbQueryErrorParams(params)) {
+      return
+    }
+
+    const { operation, repository, errorMessage } = params
 
     this.dbQueryErrors.add(1, {
       operation,
-      table,
-      errorMessage: errorMessage,
+      repository,
+      errorMessage,
+      environment: env.ENVIRONMENT,
+    })
+  }
+
+  recordDbQuery(params: {
+    operation: string
+    repository: string
+    durationSeconds: number
+  }) {
+    if (!this.isValidDbQueryParams(params)) {
+      return
+    }
+
+    const { operation, repository, durationSeconds } = params
+
+    this.dbQueryDuration.record(durationSeconds, {
+      operation,
+      repository,
+      environment: env.ENVIRONMENT,
+    })
+  }
+
+  private isValidDbQueryErrorParams(params: {
+    operation: string
+    repository: string
+    errorMessage: string
+  }): boolean {
+    const { operation, repository, errorMessage } = params
+
+    if (!operation || !repository || !errorMessage) {
+      console.warn('[MetricsManager] Invalid db query error params:', params)
+      return false
+    }
+
+    return true
+  }
+
+  private isValidDbQueryParams(params: {
+    operation: string
+    repository: string
+    durationSeconds: number
+  }): boolean {
+    const { operation, repository, durationSeconds } = params
+
+    if (!operation || !repository) {
+      console.warn('[MetricsManager] Invalid db query params:', params)
+      return false
+    }
+
+    if (isNaN(durationSeconds) || durationSeconds < 0) {
+      console.warn('[MetricsManager] Invalid duration:', durationSeconds)
+      return false
+    }
+
+    return true
+  }
+
+  recordDbTransaction(params: {
+    operation: string
+    repository: string
+    durationSeconds: number
+  }) {
+    const { operation, repository, durationSeconds } = params
+
+    this.dbTransactionsTotal.add(1, {
+      operation,
+      repository,
+      environment: env.ENVIRONMENT,
+    })
+
+    this.dbTransactionDuration.record(durationSeconds, {
+      operation,
+      repository,
+      environment: env.ENVIRONMENT,
+    })
+  }
+
+  recordDbDeadlock(params: {
+    operation: string
+    repository: string
+    errorMessage: string
+  }) {
+    const { operation, repository, errorMessage } = params
+
+    this.dbDeadlocksTotal.add(1, {
+      operation,
+      repository,
+      errorMessage,
+      environment: env.ENVIRONMENT,
+    })
+  }
+
+  recordHttpRequestBytes(
+    bytes: number,
+    attributes: {
+      method: string
+      route: string
+      statusCode: number
+    }
+  ) {
+    this.httpRequestBytesTotal.add(bytes, {
+      ...attributes,
+      status_code: attributes.statusCode.toString(),
+      environment: env.ENVIRONMENT,
+    })
+  }
+
+  recordProcessingDuration(params: {
+    operation: string
+    durationSeconds: number
+  }) {
+    const { operation, durationSeconds } = params
+
+    this.processingDuration.record(durationSeconds, {
+      operation,
+      environment: env.ENVIRONMENT,
+    })
+  }
+
+  recordProcessingError(params: { operation: string; errorType: string }) {
+    const { operation, errorType } = params
+
+    this.processingErrors.add(1, {
+      operation,
+      error_type: errorType,
       environment: env.ENVIRONMENT,
     })
   }
@@ -226,12 +408,15 @@ export class MetricsManager {
   }) {
     const { method, url, statusCode, durationSeconds, error, timeout } = params
 
+    const normalizedUrl = this.normalizeUrl(url)
     const attributes = {
       method,
-      url: this.normalizeUrl(url),
+      url: normalizedUrl,
       environment: env.ENVIRONMENT,
-      status_code: statusCode?.toString(),
+      status_code: statusCode?.toString() || 'unknown',
     }
+
+    this.httpClientRequestsTotal.add(1, attributes)
 
     this.httpClientRequestDuration.record(durationSeconds, attributes)
 
