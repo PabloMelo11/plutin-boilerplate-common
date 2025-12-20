@@ -3,7 +3,7 @@ import { Inject } from 'plutin'
 import type IBooksRepository from '@application/repositories/books-repository'
 import type Book from '@domain/book'
 
-import { RepositoryInstrumentation } from '../../../lib/repository-otel-decorator'
+import { RepositoryInstrumentation } from '../../../lib/instrumentation/repository-instrumentation'
 
 @RepositoryInstrumentation()
 export default class BooksRepositoryInMemory implements IBooksRepository {

@@ -3,6 +3,8 @@ import { Inject } from 'plutin'
 import type IBooksRepository from '@application/repositories/books-repository'
 import Book from '@domain/book'
 
+import { Instrumentation } from '../../../lib/instrumentation/processing-instrumentation'
+
 import type { CreateBookInput, CreateBookOutput } from './create-book-dto'
 
 // class ApplicationError extends Error {
@@ -19,6 +21,7 @@ import type { CreateBookInput, CreateBookOutput } from './create-book-dto'
 //   }
 // }
 
+@Instrumentation()
 export default class CreateBookUseCase {
   constructor(
     @Inject('BooksRepository') private booksRepository: IBooksRepository,
