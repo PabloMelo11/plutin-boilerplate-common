@@ -12,7 +12,7 @@ import '@infra/container'
 let otelManager: OtelManager | undefined
 
 if (env.OTEL_ENABLE) {
-  const otelManager = new OtelManager()
+  otelManager = new OtelManager()
   otelManager.initialize()
 }
 
@@ -30,8 +30,13 @@ async function main() {
 }
 
 async function shutdown() {
-  metrics.stopSystemMetricsCollection()
-  await otelManager?.shutdown()
+  try {
+    await http.closeServer()
+    metrics.stopSystemMetricsCollection()
+    await otelManager?.shutdown()
+  } catch (error) {
+    console.error('Error during shutdown:', error)
+  }
 }
 
 process.on('SIGTERM', async () => {

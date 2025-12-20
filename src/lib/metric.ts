@@ -585,6 +585,7 @@ export class MetricsManager implements IMetricsManager {
       clearInterval(this.collectionInterval)
       this.collectionInterval = undefined
     }
+
     this.eventLoopMonitor.disable()
 
     if (this.gcObserver) {
