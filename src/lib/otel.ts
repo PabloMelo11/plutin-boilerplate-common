@@ -89,7 +89,6 @@ export class OtelManager {
     })
 
     this.configureLogProcessors(provider)
-
     logs.setGlobalLoggerProvider(provider)
 
     return provider

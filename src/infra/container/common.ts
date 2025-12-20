@@ -1,10 +1,8 @@
+import { Logger } from 'src/lib/logger'
 import { MetricsManager } from 'src/lib/metric'
 import { DependencyContainer, NotificationFactory } from 'plutin'
 
 import { env } from '@infra/env'
-
-// import { Logger } from '../../lib/logger'
-import { PinoOtelLogger } from '../../lib/pino-logger'
 
 DependencyContainer.registerValue('DiscordConfig', {
   url: env.DISCORD_WEBHOOK_URL,
@@ -16,7 +14,7 @@ DependencyContainer.registerValue('SentryConfig', {
   environment: env.ENVIRONMENT,
 })
 
-DependencyContainer.register('Logger', PinoOtelLogger, { singleton: true })
+DependencyContainer.register('Logger', Logger.define(env), { singleton: true })
 
 DependencyContainer.register('Metrics', MetricsManager, { singleton: true })
 

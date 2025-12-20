@@ -1,7 +1,4 @@
 import { logs, SeverityNumber } from '@opentelemetry/api-logs'
-import pino from 'pino'
-
-import { env } from '@infra/env'
 
 type LogParams = {
   msg: string
@@ -12,34 +9,10 @@ type LogParams = {
   error?: Error
 }
 
-export class PinoOtelLogger {
-  private pinoLogger: pino.Logger
+export class OtelLogger {
   private otelLogger: ReturnType<typeof logs.getLogger>
 
   constructor() {
-    const pinoConfig: pino.LoggerOptions = {
-      level: 'debug',
-      formatters: {
-        level: (label) => {
-          return { level: label.toUpperCase() }
-        },
-      },
-      base: {
-        service: 'plutin-boilerplate-common',
-        environment: env.ENVIRONMENT,
-      },
-      timestamp: pino.stdTimeFunctions.isoTime,
-    }
-
-    if (env.ENVIRONMENT === 'development') {
-      this.pinoLogger = pino(
-        pinoConfig,
-        pino.transport({ target: 'pino-pretty' })
-      )
-    } else {
-      this.pinoLogger = pino(pinoConfig)
-    }
-
     this.otelLogger = logs.getLogger('plutin-boilerplate-common', '1.0.0')
   }
 

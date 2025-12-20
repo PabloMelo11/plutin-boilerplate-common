@@ -3,7 +3,7 @@ import type { baseEnvSchema } from 'plutin'
 
 import { ConsoleLogger } from './console'
 import { DiscordLogger } from './discord'
-import { PinoOtelLogger } from './pino-logger'
+import { OtelLogger } from './otel-logger'
 
 type OptionsNotifications = 'console' | 'discord' | 'otel'
 
@@ -38,7 +38,7 @@ export class Logger {
       case 'discord':
         return DiscordLogger
       case 'otel':
-        return env.OTEL_ENABLE === false ? DiscordLogger : PinoOtelLogger
+        return env.OTEL_ENABLE === false ? DiscordLogger : OtelLogger
       default:
         return ConsoleLogger
     }
