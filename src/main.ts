@@ -5,11 +5,16 @@ import { registerRoutes } from '@infra/routes'
 
 import { FastifyAdapter } from './lib/fastify-adapter'
 import { MetricsManager } from './lib/metric'
-import { initializeOtel, shutdownOtel } from './lib/otel'
+import { OtelManager } from './lib/otel'
 
 import '@infra/container'
 
-initializeOtel()
+let otelManager: OtelManager | undefined
+
+if (env.OTEL_ENABLE) {
+  const otelManager = new OtelManager()
+  otelManager.initialize()
+}
 
 const http = DependencyContainer.resolve(FastifyAdapter)
 const metrics = DependencyContainer.resolve(MetricsManager)
@@ -26,7 +31,7 @@ async function main() {
 
 async function shutdown() {
   metrics.stopSystemMetricsCollection()
-  await shutdownOtel()
+  await otelManager?.shutdown()
 }
 
 process.on('SIGTERM', async () => {

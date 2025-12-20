@@ -1,6 +1,6 @@
 import { Span, trace } from '@opentelemetry/api'
 import { ConsoleLogger } from 'src/lib/console'
-import { MetricsManager } from 'src/lib/metric'
+import type { IMetricsManager } from 'src/lib/metric'
 import { DependencyContainer } from 'plutin'
 
 const MILLISECONDS_TO_SECONDS = 1000
@@ -79,7 +79,7 @@ export interface IInstrumentationStrategy {
   ): (...args: any[]) => any
 }
 
-class TracerCache {
+class Tracer {
   private static instance: ReturnType<typeof trace.getTracer> | null = null
 
   static getTracer(): ReturnType<typeof trace.getTracer> {
@@ -90,12 +90,23 @@ class TracerCache {
   }
 }
 
+class Metrics {
+  private static instance: IMetricsManager
+
+  static getMetrics(): IMetricsManager {
+    if (!this.instance) {
+      this.instance = DependencyContainer.resolveToken('Metrics')
+    }
+    return this.instance
+  }
+}
+
 abstract class BaseFullInstrumentationStrategy
   implements IInstrumentationStrategy
 {
   constructor(
     protected readonly tracer: ReturnType<typeof trace.getTracer>,
-    protected readonly metrics: MetricsManager | undefined,
+    protected readonly metrics: IMetricsManager,
     protected readonly metricsRecorder: IMetricsRecorder,
     protected readonly spanBuilder: ISpanBuilder,
     protected readonly logBuilder: ILogBuilder
@@ -451,8 +462,9 @@ function instrumentMethod(
 export {
   BaseFullInstrumentationStrategy,
   BaseLogsOnlyInstrumentationStrategy,
+  Metrics,
   OTEL_ENABLED,
+  Tracer,
   TRACER_NAME,
   TRACER_VERSION,
-  TracerCache,
 }

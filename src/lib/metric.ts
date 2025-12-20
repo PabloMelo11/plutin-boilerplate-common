@@ -5,15 +5,84 @@ import v8 from 'node:v8'
 
 import { env } from '@infra/env'
 
-export class MetricsManager {
-  private meter = metrics.getMeter('plutin-boilerplate-common', '1.0.0')
+const OTEL_ENABLED = process.env.OTEL_ENABLE === 'true'
 
-  private httpRequestsTotal = this.meter.createCounter('http_requests_total', {
+export interface IMetricsManager {
+  recordHttpRequest(params: {
+    method: string
+    route: string
+    statusCode: number
+    durationSeconds: number
+    responseSizeBytes?: number
+  }): void
+
+  recordDbQueryError(params: {
+    operation: string
+    repository: string
+    errorMessage: string
+  }): void
+
+  recordDbQuery(params: {
+    operation: string
+    repository: string
+    durationSeconds: number
+  }): void
+
+  recordDbTransaction(params: {
+    operation: string
+    repository: string
+    durationSeconds: number
+  }): void
+
+  recordDbDeadlock(params: {
+    operation: string
+    repository: string
+    errorMessage: string
+  }): void
+
+  recordHttpRequestBytes(
+    bytes: number,
+    attributes: {
+      method: string
+      route: string
+      statusCode: number
+    }
+  ): void
+
+  recordProcessingDuration(params: {
+    operation: string
+    durationSeconds: number
+  }): void
+
+  recordProcessingError(params: { operation: string; errorType: string }): void
+
+  recordHttpClientRequest(params: {
+    method: string
+    url: string
+    statusCode?: number
+    durationSeconds: number
+    error?: boolean
+    timeout?: boolean
+  }): void
+
+  recordValidationError(params: { field?: string; errorType: string }): void
+
+  startSystemMetricsCollection(intervalMs?: number): void
+
+  stopSystemMetricsCollection(): void
+}
+
+export class MetricsManager implements IMetricsManager {
+  private meter = OTEL_ENABLED
+    ? metrics.getMeter('plutin-boilerplate-common', '1.0.0')
+    : null
+
+  private httpRequestsTotal = this.meter?.createCounter('http_requests_total', {
     description: 'Total de requisições HTTP',
     unit: '1',
   })
 
-  private httpRequestDuration = this.meter.createHistogram(
+  private httpRequestDuration = this.meter?.createHistogram(
     'http_request_duration_seconds',
     {
       description: 'Duração das requisições HTTP em segundos',
@@ -21,7 +90,7 @@ export class MetricsManager {
     }
   )
 
-  private httpRequestsErrors = this.meter.createCounter(
+  private httpRequestsErrors = this.meter?.createCounter(
     'http_requests_errors_total',
     {
       description: 'Total de erros HTTP (4xx, 5xx)',
@@ -29,7 +98,7 @@ export class MetricsManager {
     }
   )
 
-  private httpRequestsActive = this.meter.createUpDownCounter(
+  private httpRequestsActive = this.meter?.createUpDownCounter(
     'http_requests_active',
     {
       description: 'Número de requisições HTTP ativas',
@@ -37,7 +106,7 @@ export class MetricsManager {
     }
   )
 
-  private httpResponseSize = this.meter.createHistogram(
+  private httpResponseSize = this.meter?.createHistogram(
     'http_response_size_bytes',
     {
       description: 'Tamanho das respostas HTTP em bytes',
@@ -45,7 +114,7 @@ export class MetricsManager {
     }
   )
 
-  private dbQueryDuration = this.meter.createHistogram(
+  private dbQueryDuration = this.meter?.createHistogram(
     'db_query_duration_seconds',
     {
       description: 'Duração das queries no banco de dados',
@@ -53,12 +122,12 @@ export class MetricsManager {
     }
   )
 
-  private dbQueryErrors = this.meter.createCounter('db_query_errors_total', {
+  private dbQueryErrors = this.meter?.createCounter('db_query_errors_total', {
     description: 'Total de erros em queries do banco de dados',
     unit: '1',
   })
 
-  private dbTransactionsTotal = this.meter.createCounter(
+  private dbTransactionsTotal = this.meter?.createCounter(
     'db_transactions_total',
     {
       description: 'Total de transações no banco de dados',
@@ -66,7 +135,7 @@ export class MetricsManager {
     }
   )
 
-  private dbTransactionDuration = this.meter.createHistogram(
+  private dbTransactionDuration = this.meter?.createHistogram(
     'db_transaction_duration_seconds',
     {
       description: 'Duração das transações no banco de dados',
@@ -74,12 +143,12 @@ export class MetricsManager {
     }
   )
 
-  private dbDeadlocksTotal = this.meter.createCounter('db_deadlocks_total', {
+  private dbDeadlocksTotal = this.meter?.createCounter('db_deadlocks_total', {
     description: 'Total de deadlocks detectados no banco de dados',
     unit: '1',
   })
 
-  private httpRequestBytesTotal = this.meter.createCounter(
+  private httpRequestBytesTotal = this.meter?.createCounter(
     'http_request_bytes_total',
     {
       description: 'Total de bytes transferidos em requisições HTTP',
@@ -87,7 +156,7 @@ export class MetricsManager {
     }
   )
 
-  private processingDuration = this.meter.createHistogram(
+  private processingDuration = this.meter?.createHistogram(
     'processing_duration_seconds',
     {
       description: 'Duração de operações de processamento interno',
@@ -95,7 +164,7 @@ export class MetricsManager {
     }
   )
 
-  private processingErrors = this.meter.createCounter(
+  private processingErrors = this.meter?.createCounter(
     'processing_errors_total',
     {
       description: 'Total de erros em operações de processamento',
@@ -103,7 +172,7 @@ export class MetricsManager {
     }
   )
 
-  private httpClientRequestsTotal = this.meter.createCounter(
+  private httpClientRequestsTotal = this.meter?.createCounter(
     'http_client_requests_total',
     {
       description: 'Total de requisições HTTP client realizadas',
@@ -111,7 +180,7 @@ export class MetricsManager {
     }
   )
 
-  private httpClientRequestDuration = this.meter.createHistogram(
+  private httpClientRequestDuration = this.meter?.createHistogram(
     'http_client_request_duration_seconds',
     {
       description: 'Duração de requisições HTTP client em segundos',
@@ -119,7 +188,7 @@ export class MetricsManager {
     }
   )
 
-  private httpClientErrors = this.meter.createCounter(
+  private httpClientErrors = this.meter?.createCounter(
     'http_client_errors_total',
     {
       description: 'Total de erros em requisições HTTP client',
@@ -127,7 +196,7 @@ export class MetricsManager {
     }
   )
 
-  private httpClientTimeouts = this.meter.createCounter(
+  private httpClientTimeouts = this.meter?.createCounter(
     'http_client_timeouts_total',
     {
       description: 'Total de timeouts em requisições HTTP client',
@@ -135,7 +204,7 @@ export class MetricsManager {
     }
   )
 
-  private validationErrors = this.meter.createCounter(
+  private validationErrors = this.meter?.createCounter(
     'validation_errors_total',
     {
       description: 'Total de erros de validação',
@@ -143,7 +212,7 @@ export class MetricsManager {
     }
   )
 
-  private processCpuSecondsTotal = this.meter.createCounter(
+  private processCpuSecondsTotal = this.meter?.createCounter(
     'process_cpu_seconds_total',
     {
       description: 'Total CPU time spent in seconds',
@@ -151,7 +220,7 @@ export class MetricsManager {
     }
   )
 
-  private processMemoryBytes = this.meter.createObservableGauge(
+  private processMemoryBytes = this.meter?.createObservableGauge(
     'process_memory_bytes',
     {
       description: 'Memory usage in bytes',
@@ -159,7 +228,7 @@ export class MetricsManager {
     }
   )
 
-  private nodejsHeapSizeTotalBytes = this.meter.createObservableGauge(
+  private nodejsHeapSizeTotalBytes = this.meter?.createObservableGauge(
     'nodejs_heap_size_total_bytes',
     {
       description: 'Total size of the allocated heap in bytes',
@@ -167,7 +236,7 @@ export class MetricsManager {
     }
   )
 
-  private nodejsHeapSizeUsedBytes = this.meter.createObservableGauge(
+  private nodejsHeapSizeUsedBytes = this.meter?.createObservableGauge(
     'nodejs_heap_size_used_bytes',
     {
       description: 'Used heap size in bytes',
@@ -175,7 +244,7 @@ export class MetricsManager {
     }
   )
 
-  private nodejsEventloopLagSeconds = this.meter.createObservableGauge(
+  private nodejsEventloopLagSeconds = this.meter?.createObservableGauge(
     'nodejs_eventloop_lag_seconds',
     {
       description: 'Event loop lag in seconds',
@@ -183,7 +252,7 @@ export class MetricsManager {
     }
   )
 
-  private nodejsEventloopDurationSeconds = this.meter.createHistogram(
+  private nodejsEventloopDurationSeconds = this.meter?.createHistogram(
     'nodejs_eventloop_duration_seconds',
     {
       description: 'Event loop duration in seconds',
@@ -191,7 +260,7 @@ export class MetricsManager {
     }
   )
 
-  private nodejsGcDurationSeconds = this.meter.createHistogram(
+  private nodejsGcDurationSeconds = this.meter?.createHistogram(
     'nodejs_gc_duration_seconds',
     {
       description: 'Garbage collection duration in seconds',
@@ -199,7 +268,7 @@ export class MetricsManager {
     }
   )
 
-  private processOpenFds = this.meter.createObservableGauge(
+  private processOpenFds = this.meter?.createObservableGauge(
     'process_open_fds',
     {
       description: 'Number of open file descriptors',
@@ -207,7 +276,7 @@ export class MetricsManager {
     }
   )
 
-  private processUptimeSeconds = this.meter.createObservableGauge(
+  private processUptimeSeconds = this.meter?.createObservableGauge(
     'process_uptime_seconds',
     {
       description: 'Process uptime in seconds',
@@ -227,6 +296,10 @@ export class MetricsManager {
     durationSeconds: number
     responseSizeBytes?: number
   }) {
+    if (!OTEL_ENABLED) {
+      return
+    }
+
     const { method, route, statusCode, durationSeconds, responseSizeBytes } =
       params
 
@@ -238,19 +311,19 @@ export class MetricsManager {
       environment: env.ENVIRONMENT,
     }
 
-    this.httpRequestsTotal.add(1, attributes)
+    this.httpRequestsTotal?.add(1, attributes)
 
-    this.httpRequestDuration.record(durationSeconds, attributes)
+    this.httpRequestDuration?.record(durationSeconds, attributes)
 
     if (statusCode >= 400) {
-      this.httpRequestsErrors.add(1, {
+      this.httpRequestsErrors?.add(1, {
         ...attributes,
         error_type: statusCode >= 500 ? 'server_error' : 'client_error',
       })
     }
 
     if (responseSizeBytes) {
-      this.httpResponseSize.record(responseSizeBytes, attributes)
+      this.httpResponseSize?.record(responseSizeBytes, attributes)
     }
   }
 
@@ -259,13 +332,17 @@ export class MetricsManager {
     repository: string
     errorMessage: string
   }) {
+    if (!OTEL_ENABLED) {
+      return
+    }
+
     if (!this.isValidDbQueryErrorParams(params)) {
       return
     }
 
     const { operation, repository, errorMessage } = params
 
-    this.dbQueryErrors.add(1, {
+    this.dbQueryErrors?.add(1, {
       operation,
       repository,
       errorMessage,
@@ -278,13 +355,17 @@ export class MetricsManager {
     repository: string
     durationSeconds: number
   }) {
+    if (!OTEL_ENABLED) {
+      return
+    }
+
     if (!this.isValidDbQueryParams(params)) {
       return
     }
 
     const { operation, repository, durationSeconds } = params
 
-    this.dbQueryDuration.record(durationSeconds, {
+    this.dbQueryDuration?.record(durationSeconds, {
       operation,
       repository,
       environment: env.ENVIRONMENT,
@@ -331,15 +412,19 @@ export class MetricsManager {
     repository: string
     durationSeconds: number
   }) {
+    if (!OTEL_ENABLED) {
+      return
+    }
+
     const { operation, repository, durationSeconds } = params
 
-    this.dbTransactionsTotal.add(1, {
+    this.dbTransactionsTotal?.add(1, {
       operation,
       repository,
       environment: env.ENVIRONMENT,
     })
 
-    this.dbTransactionDuration.record(durationSeconds, {
+    this.dbTransactionDuration?.record(durationSeconds, {
       operation,
       repository,
       environment: env.ENVIRONMENT,
@@ -351,9 +436,13 @@ export class MetricsManager {
     repository: string
     errorMessage: string
   }) {
+    if (!OTEL_ENABLED) {
+      return
+    }
+
     const { operation, repository, errorMessage } = params
 
-    this.dbDeadlocksTotal.add(1, {
+    this.dbDeadlocksTotal?.add(1, {
       operation,
       repository,
       errorMessage,
@@ -369,7 +458,11 @@ export class MetricsManager {
       statusCode: number
     }
   ) {
-    this.httpRequestBytesTotal.add(bytes, {
+    if (!OTEL_ENABLED) {
+      return
+    }
+
+    this.httpRequestBytesTotal?.add(bytes, {
       ...attributes,
       status_code: attributes.statusCode.toString(),
       environment: env.ENVIRONMENT,
@@ -380,18 +473,26 @@ export class MetricsManager {
     operation: string
     durationSeconds: number
   }) {
+    if (!OTEL_ENABLED) {
+      return
+    }
+
     const { operation, durationSeconds } = params
 
-    this.processingDuration.record(durationSeconds, {
+    this.processingDuration?.record(durationSeconds, {
       operation,
       environment: env.ENVIRONMENT,
     })
   }
 
   recordProcessingError(params: { operation: string; errorType: string }) {
+    if (!OTEL_ENABLED) {
+      return
+    }
+
     const { operation, errorType } = params
 
-    this.processingErrors.add(1, {
+    this.processingErrors?.add(1, {
       operation,
       error_type: errorType,
       environment: env.ENVIRONMENT,
@@ -406,6 +507,10 @@ export class MetricsManager {
     error?: boolean
     timeout?: boolean
   }) {
+    if (!OTEL_ENABLED) {
+      return
+    }
+
     const { method, url, statusCode, durationSeconds, error, timeout } = params
 
     const normalizedUrl = this.normalizeUrl(url)
@@ -416,26 +521,30 @@ export class MetricsManager {
       status_code: statusCode?.toString() || 'unknown',
     }
 
-    this.httpClientRequestsTotal.add(1, attributes)
+    this.httpClientRequestsTotal?.add(1, attributes)
 
-    this.httpClientRequestDuration.record(durationSeconds, attributes)
+    this.httpClientRequestDuration?.record(durationSeconds, attributes)
 
     if (error) {
-      this.httpClientErrors.add(1, {
+      this.httpClientErrors?.add(1, {
         ...attributes,
         error_type: timeout ? 'timeout' : 'connection_error',
       })
     }
 
     if (timeout) {
-      this.httpClientTimeouts.add(1, attributes)
+      this.httpClientTimeouts?.add(1, attributes)
     }
   }
 
   recordValidationError(params: { field?: string; errorType: string }) {
+    if (!OTEL_ENABLED) {
+      return
+    }
+
     const { field, errorType } = params
 
-    this.validationErrors.add(1, {
+    this.validationErrors?.add(1, {
       field: field || 'unknown',
       error_type: errorType,
       environment: env.ENVIRONMENT,
@@ -443,21 +552,24 @@ export class MetricsManager {
   }
 
   startSystemMetricsCollection(intervalMs: number = 5000) {
+    if (!OTEL_ENABLED || !this.meter) {
+      return
+    }
+
     this.eventLoopMonitor.enable()
 
-    this.meter.addBatchObservableCallback(
-      (observableResult) => {
-        this.collectSystemMetrics(observableResult)
-      },
-      [
-        this.processMemoryBytes,
-        this.nodejsHeapSizeTotalBytes,
-        this.nodejsHeapSizeUsedBytes,
-        this.nodejsEventloopLagSeconds,
-        this.processOpenFds,
-        this.processUptimeSeconds,
-      ]
-    )
+    const observables = [
+      this.processMemoryBytes,
+      this.nodejsHeapSizeTotalBytes,
+      this.nodejsHeapSizeUsedBytes,
+      this.nodejsEventloopLagSeconds,
+      this.processOpenFds,
+      this.processUptimeSeconds,
+    ].filter((obs): obs is NonNullable<typeof obs> => obs !== undefined)
+
+    this.meter.addBatchObservableCallback((observableResult) => {
+      this.collectSystemMetrics(observableResult)
+    }, observables)
 
     this.setupGCObserver()
 
@@ -482,26 +594,30 @@ export class MetricsManager {
   }
 
   private collectSystemMetrics(observableResult: any) {
+    if (!OTEL_ENABLED) {
+      return
+    }
+
     const attributes = {
       environment: env.ENVIRONMENT,
     }
 
     const memUsage = process.memoryUsage()
-    observableResult.observe(this.processMemoryBytes, memUsage.rss, {
+    observableResult.observe(this.processMemoryBytes!, memUsage.rss, {
       ...attributes,
       type: 'rss',
     })
 
-    observableResult.observe(this.processMemoryBytes, memUsage.heapTotal, {
+    observableResult.observe(this.processMemoryBytes!, memUsage.heapTotal, {
       ...attributes,
       type: 'heap_total',
     })
 
-    observableResult.observe(this.processMemoryBytes, memUsage.heapUsed, {
+    observableResult.observe(this.processMemoryBytes!, memUsage.heapUsed, {
       ...attributes,
       type: 'heap_used',
     })
-    observableResult.observe(this.processMemoryBytes, memUsage.external, {
+    observableResult.observe(this.processMemoryBytes!, memUsage.external, {
       ...attributes,
       type: 'external',
     })
@@ -509,20 +625,20 @@ export class MetricsManager {
     const heapStats = v8.getHeapStatistics()
 
     observableResult.observe(
-      this.nodejsHeapSizeTotalBytes,
+      this.nodejsHeapSizeTotalBytes!,
       heapStats.total_heap_size,
       attributes
     )
 
     observableResult.observe(
-      this.nodejsHeapSizeUsedBytes,
+      this.nodejsHeapSizeUsedBytes!,
       heapStats.used_heap_size,
       attributes
     )
 
     const lagMs = this.eventLoopMonitor.mean / 1_000_000
     observableResult.observe(
-      this.nodejsEventloopLagSeconds,
+      this.nodejsEventloopLagSeconds!,
       lagMs / 1000,
       attributes
     )
@@ -532,7 +648,7 @@ export class MetricsManager {
 
       if (resourceUsage) {
         observableResult.observe(
-          this.processOpenFds,
+          this.processOpenFds!,
           resourceUsage.maxRSS || 0,
           {
             ...attributes,
@@ -545,13 +661,17 @@ export class MetricsManager {
     }
 
     observableResult.observe(
-      this.processUptimeSeconds,
+      this.processUptimeSeconds!,
       process.uptime(),
       attributes
     )
   }
 
   private collectPeriodicMetrics() {
+    if (!OTEL_ENABLED) {
+      return
+    }
+
     const attributes = {
       environment: env.ENVIRONMENT,
     }
@@ -563,12 +683,12 @@ export class MetricsManager {
     const systemCpuSeconds =
       (currentCpuUsage.system / 1_000_000) * cpus().length
 
-    this.processCpuSecondsTotal.add(userCpuSeconds, {
+    this.processCpuSecondsTotal?.add(userCpuSeconds, {
       ...attributes,
       mode: 'user',
     })
 
-    this.processCpuSecondsTotal.add(systemCpuSeconds, {
+    this.processCpuSecondsTotal?.add(systemCpuSeconds, {
       ...attributes,
       mode: 'system',
     })
@@ -578,18 +698,22 @@ export class MetricsManager {
     const eventLoopDuration = this.eventLoopMonitor.mean / 1_000_000_000
 
     if (eventLoopDuration > 0) {
-      this.nodejsEventloopDurationSeconds.record(eventLoopDuration, attributes)
+      this.nodejsEventloopDurationSeconds?.record(eventLoopDuration, attributes)
     }
   }
 
   private setupGCObserver() {
+    if (!OTEL_ENABLED) {
+      return
+    }
+
     try {
       this.gcObserver = new PerformanceObserver((list) => {
         for (const entry of list.getEntries()) {
           const gcType = (entry as any).kind || 'unknown'
           const duration = entry.duration / 1000
 
-          this.nodejsGcDurationSeconds.record(duration, {
+          this.nodejsGcDurationSeconds?.record(duration, {
             environment: env.ENVIRONMENT,
             kind: this.getGCKindName(gcType),
           })

@@ -23,104 +23,176 @@ import {
 
 import { env } from '@infra/env'
 
-if (env.ENVIRONMENT !== 'development') {
-  diag.setLogger(new DiagConsoleLogger(), DiagLogLevel.WARN)
+const SERVICE_NAME = 'plutin-boilerplate-common'
+const SERVICE_VERSION = '1.0.0'
+const OTLP_ENDPOINT = 'http://localhost:14318'
+const DEVELOPMENT_SAMPLE_RATE = 1.0
+const PRODUCTION_SAMPLE_RATE = 0.01
+
+type OtelConfig = {
+  serviceName?: string
+  serviceVersion?: string
+  otlpEndpoint?: string
+  developmentSampleRate?: number
+  productionSampleRate?: number
 }
 
-const resource = new Resource({
-  [ATTR_SERVICE_NAME]: 'plutin-boilerplate-common',
-  [ATTR_SERVICE_VERSION]: '1.0.0',
-  [SEMRESATTRS_DEPLOYMENT_ENVIRONMENT]: env.ENVIRONMENT,
-})
+export class OtelManager {
+  private readonly resource: Resource
+  private readonly loggerProvider: LoggerProvider
+  private readonly sdk: NodeSDK
+  private readonly otlpLogExporter: OTLPLogExporter
+  private readonly consoleLogExporter: ConsoleLogRecordExporter
+  private readonly traceExporter: OTLPTraceExporter
+  private readonly metricExporter: OTLPMetricExporter
+  private readonly metricReader: PeriodicExportingMetricReader
+  private readonly sampler: TraceIdRatioBasedSampler
 
-const otlpLogExporter = new OTLPLogExporter({
-  url: 'http://localhost:14318/v1/logs',
-  headers: {},
-})
+  constructor(config: OtelConfig = {}) {
+    this.configureDiagnostics()
+    this.resource = this.createResource(config)
+    this.otlpLogExporter = this.createOtlpLogExporter(config)
+    this.consoleLogExporter = new ConsoleLogRecordExporter()
+    this.loggerProvider = this.createLoggerProvider()
+    this.traceExporter = this.createTraceExporter(config)
+    this.sampler = this.createSampler(config)
+    this.metricExporter = this.createMetricExporter(config)
+    this.metricReader = this.createMetricReader()
+    this.sdk = this.createSdk()
+  }
 
-const consoleLogExporter = new ConsoleLogRecordExporter()
+  private configureDiagnostics(): void {
+    if (env.ENVIRONMENT !== 'development') {
+      diag.setLogger(new DiagConsoleLogger(), DiagLogLevel.WARN)
+    }
+  }
 
-const loggerProvider = new LoggerProvider({
-  resource,
-})
-
-if (env.ENVIRONMENT === 'development') {
-  loggerProvider.addLogRecordProcessor(
-    new BatchLogRecordProcessor(otlpLogExporter, {
-      maxQueueSize: 100,
-      maxExportBatchSize: 10,
-      scheduledDelayMillis: 1000,
+  private createResource(config: OtelConfig): Resource {
+    return new Resource({
+      [ATTR_SERVICE_NAME]: config.serviceName || SERVICE_NAME,
+      [ATTR_SERVICE_VERSION]: config.serviceVersion || SERVICE_VERSION,
+      [SEMRESATTRS_DEPLOYMENT_ENVIRONMENT]: env.ENVIRONMENT,
     })
-  )
-  loggerProvider.addLogRecordProcessor(
-    new BatchLogRecordProcessor(consoleLogExporter)
-  )
-} else {
-  loggerProvider.addLogRecordProcessor(
-    new BatchLogRecordProcessor(otlpLogExporter, {
-      maxQueueSize: 1000,
-      maxExportBatchSize: 100,
-      scheduledDelayMillis: 5000,
+  }
+
+  private createOtlpLogExporter(config: OtelConfig): OTLPLogExporter {
+    const endpoint = config.otlpEndpoint || OTLP_ENDPOINT
+    return new OTLPLogExporter({
+      url: `${endpoint}/v1/logs`,
+      headers: {},
     })
-  )
-}
+  }
 
-logs.setGlobalLoggerProvider(loggerProvider)
+  private createLoggerProvider(): LoggerProvider {
+    const provider = new LoggerProvider({
+      resource: this.resource,
+    })
 
-const traceExporter = new OTLPTraceExporter({
-  url: 'http://localhost:14318/v1/traces',
-})
+    this.configureLogProcessors(provider)
 
-const sampler = new TraceIdRatioBasedSampler(
-  env.ENVIRONMENT === 'development' ? 1.0 : 0.01
-)
+    logs.setGlobalLoggerProvider(provider)
 
-const metricExporter = new OTLPMetricExporter({
-  url: 'http://localhost:14318/v1/metrics',
-  // compression: CompressionAlgorithm.GZIP,
-})
+    return provider
+  }
 
-const metricReader = new PeriodicExportingMetricReader({
-  exporter: metricExporter,
-  exportIntervalMillis: 5000,
-  exportTimeoutMillis: 5000,
-})
+  private configureLogProcessors(provider: LoggerProvider): void {
+    if (env.ENVIRONMENT === 'development') {
+      provider.addLogRecordProcessor(
+        new BatchLogRecordProcessor(this.otlpLogExporter, {
+          maxQueueSize: 100,
+          maxExportBatchSize: 10,
+          scheduledDelayMillis: 1000,
+        })
+      )
+      provider.addLogRecordProcessor(
+        new BatchLogRecordProcessor(this.consoleLogExporter)
+      )
+    } else {
+      provider.addLogRecordProcessor(
+        new BatchLogRecordProcessor(this.otlpLogExporter, {
+          maxQueueSize: 1000,
+          maxExportBatchSize: 100,
+          scheduledDelayMillis: 5000,
+        })
+      )
+    }
+  }
 
-export const sdk = new NodeSDK({
-  resource,
-  metricReader,
-  traceExporter,
-  instrumentations: [
-    getNodeAutoInstrumentations({
-      '@opentelemetry/instrumentation-fs': {
-        enabled: false,
-      },
-    }),
-    new HttpInstrumentation(),
-    new FastifyOtelInstrumentation({
-      registerOnInitialization: true,
-    }),
-  ],
-  sampler,
-})
+  private createTraceExporter(config: OtelConfig): OTLPTraceExporter {
+    const endpoint = config.otlpEndpoint || OTLP_ENDPOINT
+    return new OTLPTraceExporter({
+      url: `${endpoint}/v1/traces`,
+    })
+  }
 
-export function initializeOtel() {
-  try {
-    sdk.start()
-  } catch (error) {
-    console.error('❌ Erro ao inicializar OpenTelemetry SDK:', error)
-    throw error
+  private createSampler(config: OtelConfig): TraceIdRatioBasedSampler {
+    const sampleRate =
+      env.ENVIRONMENT === 'development'
+        ? config.developmentSampleRate || DEVELOPMENT_SAMPLE_RATE
+        : config.productionSampleRate || PRODUCTION_SAMPLE_RATE
+
+    return new TraceIdRatioBasedSampler(sampleRate)
+  }
+
+  private createMetricExporter(config: OtelConfig): OTLPMetricExporter {
+    const endpoint = config.otlpEndpoint || OTLP_ENDPOINT
+    return new OTLPMetricExporter({
+      url: `${endpoint}/v1/metrics`,
+    })
+  }
+
+  private createMetricReader(): PeriodicExportingMetricReader {
+    return new PeriodicExportingMetricReader({
+      exporter: this.metricExporter,
+      exportIntervalMillis: 5000,
+      exportTimeoutMillis: 5000,
+    })
+  }
+
+  private createSdk(): NodeSDK {
+    return new NodeSDK({
+      resource: this.resource,
+      metricReader: this.metricReader,
+      traceExporter: this.traceExporter,
+      instrumentations: [
+        getNodeAutoInstrumentations({
+          '@opentelemetry/instrumentation-fs': {
+            enabled: false,
+          },
+        }),
+        new HttpInstrumentation(),
+        new FastifyOtelInstrumentation({
+          registerOnInitialization: true,
+        }),
+      ],
+      sampler: this.sampler,
+    })
+  }
+
+  initialize(): void {
+    try {
+      this.sdk.start()
+    } catch (error) {
+      console.error('❌ Erro ao inicializar OpenTelemetry SDK:', error)
+      throw error
+    }
+  }
+
+  async shutdown(): Promise<void> {
+    try {
+      await this.loggerProvider.forceFlush()
+      await this.loggerProvider.shutdown()
+      await this.sdk.shutdown()
+    } catch (error) {
+      console.error('❌ Erro ao desligar OpenTelemetry SDK:', error)
+    }
+  }
+
+  getLoggerProvider(): LoggerProvider {
+    return this.loggerProvider
+  }
+
+  getSdk(): NodeSDK {
+    return this.sdk
   }
 }
-
-export async function shutdownOtel() {
-  try {
-    await loggerProvider.forceFlush()
-    await loggerProvider.shutdown()
-    await sdk.shutdown()
-  } catch (error) {
-    console.error('❌ Erro ao desligar OpenTelemetry SDK:', error)
-  }
-}
-
-export { loggerProvider }

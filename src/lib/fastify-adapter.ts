@@ -1,5 +1,4 @@
 import cors from '@fastify/cors'
-import { SpanStatusCode, trace } from '@opentelemetry/api'
 import fastify, { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify'
 import { randomUUID } from 'node:crypto'
 import qs from 'qs'
@@ -7,7 +6,8 @@ import { type BaseController, type IHttp, Inject } from 'plutin'
 
 import { env } from '@infra/env'
 
-import type { MetricsManager } from './metric'
+import type { IMetricsManager } from './metric'
+import { SpanManager } from './span-manager'
 import { validateControllerMetadata } from './validate-controller-metadata'
 
 type AnyObject = Record<string, any>
@@ -24,7 +24,7 @@ export class FastifyAdapter implements IHttp {
 
   constructor(
     @Inject('Logger') private logger: any,
-    @Inject('Metrics') private metrics: MetricsManager
+    @Inject('Metrics') private metrics?: IMetricsManager
   ) {
     this.instance = fastify({
       bodyLimit: 10 * 1024 * 1024,
@@ -38,56 +38,53 @@ export class FastifyAdapter implements IHttp {
     this.instance.register(cors)
 
     this.instance.addHook('onRequest', async (request) => {
-      const span = trace.getActiveSpan()
+      const span = SpanManager.getActiveSpan()
 
-      if (span) {
-        span.setAttributes({
-          httpMethod: request.method,
+      span.setAttributes({
+        httpMethod: request.method,
+        httpUrl: request.url,
+        httpRoute: request.routeOptions.url || request.url,
+        httpHost: request.hostname,
+        httpScheme: request.protocol,
+        httpUserAgent: request.headers['user-agent'] || 'unknown',
+        httpRequestId: request.id,
+        httpClientIp: request.ip,
+      })
+
+      this.logger.info({
+        msg: 'http-in',
+        data: {
+          requestId: request.id,
           httpUrl: request.url,
-          httpRoute: request.routeOptions.url || request.url,
-          httpHost: request.hostname,
-          httpScheme: request.protocol,
-          httpUserAgent: request.headers['user-agent'] || 'unknown',
-          httpRequestId: request.id,
-          httpClientIp: request.ip,
-        })
-
-        this.logger.info({
-          msg: 'http-in',
-          data: {
-            requestId: request.id,
-            httpUrl: request.url,
-            httpMethod: request.method,
-            httpHeaders: request?.headers,
-            httpParams: request?.params,
-            httpQuery: request?.query,
-          },
-        })
-      }
+          httpMethod: request.method,
+          httpHeaders: request?.headers,
+          httpParams: request?.params,
+          httpQuery: request?.query,
+        },
+      })
     })
 
     this.instance.addHook('onResponse', async (request, reply) => {
       const route = this.getNormalizedRoute(request)
-      const span = trace.getActiveSpan()
+      const span = SpanManager.getActiveSpan()
+      const responseTime = reply.elapsedTime || 0
 
-      if (span) {
-        const responseTime = reply.elapsedTime || 0
+      span.setAttributes({
+        httpStatusCode: reply.statusCode,
+      })
 
-        span.setAttributes({
-          httpStatusCode: reply.statusCode,
-        })
+      this.logger.info({
+        msg: 'http-out',
+        data: {
+          requestId: request.id,
+          httpRoute: route,
+          httpMethod: request.method,
+          responseTimeMs: Math.round(responseTime),
+          statusCode: reply.statusCode,
+        },
+      })
 
-        this.logger.info({
-          msg: 'http-out',
-          data: {
-            requestId: request.id,
-            httpRoute: route,
-            httpMethod: request.method,
-            responseTimeMs: Math.round(responseTime),
-            statusCode: reply.statusCode,
-          },
-        })
-
+      if (this.metrics) {
         const responseSizeBytes = reply.getHeader('content-length')
           ? parseInt(reply.getHeader('content-length') as string, 10)
           : undefined
@@ -124,28 +121,23 @@ export class FastifyAdapter implements IHttp {
           query: request.query,
         } as Request
 
-        const activeSpan = trace.getActiveSpan()
+        const activeSpan = SpanManager.getActiveSpan()
 
         try {
-          if (activeSpan) {
-            activeSpan.setAttributes({
-              controllerName: controllerClass.constructor.name,
-              controllerMethod: metadata.method,
-              controllerPath: metadata.path,
-            })
-          }
+          activeSpan.setAttributes({
+            controllerName: controllerClass.constructor.name,
+            controllerMethod: metadata.method,
+            controllerPath: metadata.path,
+          })
 
           const output = await controllerClass.execute(requestData)
 
-          if (activeSpan) {
-            activeSpan.setStatus({ code: SpanStatusCode.OK })
-            activeSpan.setAttribute('httpStatusCode', output.code || 200)
-
-            activeSpan.setAttribute(
-              'responseCode',
-              output.data?.code || 'no-code'
-            )
-          }
+          activeSpan.setStatus({ code: 1 })
+          activeSpan.setAttribute('httpStatusCode', output.code || 200)
+          activeSpan.setAttribute(
+            'responseCode',
+            output.data?.code || 'no-code'
+          )
 
           return reply.status(output.code || 200).send(
             output.data || {
@@ -153,20 +145,18 @@ export class FastifyAdapter implements IHttp {
             }
           )
         } catch (err: any) {
-          if (activeSpan) {
-            activeSpan.setStatus({
-              code: SpanStatusCode.ERROR,
-              message: err.message,
-            })
+          activeSpan.setStatus({
+            code: 2,
+            message: err.message,
+          })
 
-            activeSpan.recordException(err)
+          activeSpan.recordException(err)
 
-            activeSpan.setAttributes({
-              error: true,
-              errorType: err.name,
-              errorMessage: err.message,
-            })
-          }
+          activeSpan.setAttributes({
+            error: true,
+            errorType: err.name,
+            errorMessage: err.message,
+          })
 
           const error = await controllerClass.failure(err, {
             env: env.ENVIRONMENT,
@@ -180,10 +170,8 @@ export class FastifyAdapter implements IHttp {
             },
           })
 
-          if (activeSpan) {
-            activeSpan.setAttribute('httpStatusCode', error.code || 500)
-            activeSpan.setAttribute('responseCode', error.data?.code || 'B002')
-          }
+          activeSpan.setAttribute('httpStatusCode', error.code || 500)
+          activeSpan.setAttribute('responseCode', error.data?.code || 'B002')
 
           return reply.status(error.code || 500).send(
             error.data || {

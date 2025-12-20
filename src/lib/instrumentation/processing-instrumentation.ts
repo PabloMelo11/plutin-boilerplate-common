@@ -1,6 +1,5 @@
 import { Span, SpanKind, SpanStatusCode, trace } from '@opentelemetry/api'
-import { MetricsManager } from 'src/lib/metric'
-import { DependencyContainer } from 'plutin'
+import type { IMetricsManager } from 'src/lib/metric'
 
 import {
   BaseExecutionContext,
@@ -11,12 +10,13 @@ import {
   IMetricsRecorder,
   instrumentInstanceMethods,
   ISpanBuilder,
+  Metrics,
   OTEL_ENABLED,
   preserveClassName,
   resolveLogger,
   sanitizeArgs,
+  Tracer,
   TRACER_NAME,
-  TracerCache,
 } from './base-instrumentation-strategy'
 
 type ProcessingExecutionContext = BaseExecutionContext & {
@@ -28,7 +28,7 @@ type InstrumentationOptions = {
 }
 
 class ProcessingMetricsRecorder implements IMetricsRecorder {
-  constructor(private readonly metrics: MetricsManager | undefined) {}
+  constructor(private readonly metrics: IMetricsManager | undefined) {}
 
   recordSuccess(context: BaseExecutionContext, durationSeconds: number): void {
     if (!this.metrics) {
@@ -161,7 +161,7 @@ class ProcessingLogBuilder implements ILogBuilder {
 class ProcessingFullInstrumentationStrategy extends BaseFullInstrumentationStrategy {
   constructor(
     tracer: ReturnType<typeof trace.getTracer>,
-    metrics: MetricsManager | undefined,
+    metrics: IMetricsManager,
     serviceName: string
   ) {
     super(
@@ -181,35 +181,19 @@ class ProcessingLogsOnlyInstrumentationStrategy extends BaseLogsOnlyInstrumentat
 }
 
 class ProcessingInstrumentationStrategyFactory {
-  private static cachedMetrics: MetricsManager | undefined | null = null
-
   static create(serviceName: string) {
     if (!OTEL_ENABLED) {
       return new ProcessingLogsOnlyInstrumentationStrategy()
     }
 
-    const tracer = TracerCache.getTracer()
-    const metrics = this.getMetrics()
+    const tracer = Tracer.getTracer()
+    const metrics = Metrics.getMetrics()
 
     return new ProcessingFullInstrumentationStrategy(
       tracer,
       metrics,
       serviceName
     )
-  }
-
-  private static getMetrics(): MetricsManager | undefined {
-    if (this.cachedMetrics !== null) {
-      return this.cachedMetrics || undefined
-    }
-
-    try {
-      this.cachedMetrics = DependencyContainer.resolveToken('Metrics')
-    } catch {
-      this.cachedMetrics = undefined
-    }
-
-    return this.cachedMetrics || undefined
   }
 }
 

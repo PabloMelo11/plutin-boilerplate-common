@@ -17,22 +17,28 @@ export class Logger {
   static define(env: z.infer<typeof baseEnvSchema>, definitions?: Props): any {
     const definition = {
       test: 'console',
-      development: this.defineProvider(definitions?.development || 'console'),
-      staging: this.defineProvider(definitions?.staging || 'discord'),
-      production: this.defineProvider(definitions?.production || 'otel'),
+      development: this.defineProvider(
+        env,
+        definitions?.development || 'console'
+      ),
+      staging: this.defineProvider(env, definitions?.staging || 'discord'),
+      production: this.defineProvider(env, definitions?.production || 'otel'),
     }
 
     return definition[env.ENVIRONMENT]
   }
 
-  private static defineProvider(provider: OptionsNotifications) {
+  private static defineProvider(
+    env: z.infer<typeof baseEnvSchema>,
+    provider: OptionsNotifications
+  ) {
     switch (provider) {
       case 'console':
         return ConsoleLogger
       case 'discord':
         return DiscordLogger
       case 'otel':
-        return PinoOtelLogger
+        return env.OTEL_ENABLE === false ? DiscordLogger : PinoOtelLogger
       default:
         return ConsoleLogger
     }
