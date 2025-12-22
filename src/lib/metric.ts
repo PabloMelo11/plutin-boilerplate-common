@@ -74,7 +74,10 @@ export interface IMetricsManager {
 
 export class MetricsManager implements IMetricsManager {
   private meter = OTEL_ENABLED
-    ? metrics.getMeter('plutin-boilerplate-common', '1.0.0')
+    ? metrics.getMeter(
+        process.env.OTEL_SERVICE_NAME || 'plutin-boilerplate-common',
+        process.env.OTEL_SERVICE_VERSION || '1.0.0'
+      )
     : null
 
   private httpRequestsTotal = this.meter?.createCounter('http_requests_total', {
@@ -581,6 +584,10 @@ export class MetricsManager implements IMetricsManager {
   }
 
   stopSystemMetricsCollection() {
+    if (!OTEL_ENABLED || !this.meter) {
+      return
+    }
+
     if (this.collectionInterval) {
       clearInterval(this.collectionInterval)
       this.collectionInterval = undefined

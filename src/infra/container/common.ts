@@ -14,7 +14,11 @@ DependencyContainer.registerValue('SentryConfig', {
   environment: env.ENVIRONMENT,
 })
 
-DependencyContainer.register('Logger', Logger.define(env), { singleton: true })
+DependencyContainer.register(
+  'Logger',
+  Logger.define(env, { development: 'otel' }),
+  { singleton: true }
+)
 
 DependencyContainer.register('Metrics', MetricsManager, { singleton: true })
 

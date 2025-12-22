@@ -7,6 +7,13 @@ const envSchema = baseEnvSchema
   .merge(
     z.object({
       DATABASE_URL: z.string().url(),
+      OTEL_ENABLE: z
+        .string()
+        .transform((val) => val === 'true')
+        .default('false'),
+      OTEL_EXPORTER_OTLP_ENDPOINT: z.string().url().optional(),
+      OTEL_SERVICE_NAME: z.string().optional(),
+      OTEL_SERVICE_VERSION: z.string().optional(),
     })
   )
   .catchall(z.any())

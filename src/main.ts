@@ -12,7 +12,7 @@ import '@infra/container'
 let otelManager: OtelManager | undefined
 
 if (env.OTEL_ENABLE) {
-  otelManager = new OtelManager()
+  otelManager = new OtelManager(env)
   otelManager.initialize()
 }
 
@@ -22,9 +22,7 @@ const metrics = DependencyContainer.resolve(MetricsManager)
 async function main() {
   const globalErrorHandler = new GlobalErrorHandler(env)
   globalErrorHandler.register()
-
   metrics.startSystemMetricsCollection(5000)
-
   registerRoutes(http)
   http.startServer(env.PORT)
 }

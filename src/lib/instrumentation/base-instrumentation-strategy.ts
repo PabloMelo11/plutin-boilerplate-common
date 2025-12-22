@@ -1,7 +1,8 @@
 import { Span, trace } from '@opentelemetry/api'
-import { ConsoleLogger } from 'src/lib/console'
 import type { IMetricsManager } from 'src/lib/metric'
 import { DependencyContainer } from 'plutin'
+
+import { PinoLogger } from '../pino-logger'
 
 const MILLISECONDS_TO_SECONDS = 1000
 const ROUNDING_PRECISION = 100
@@ -353,7 +354,7 @@ export function resolveLogger(): any {
   try {
     return DependencyContainer.resolveToken('Logger')
   } catch {
-    return new ConsoleLogger()
+    return new PinoLogger()
   }
 }
 

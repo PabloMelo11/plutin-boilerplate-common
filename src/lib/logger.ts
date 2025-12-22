@@ -1,9 +1,9 @@
 import type { z } from 'zod'
 import type { baseEnvSchema } from 'plutin'
 
-import { ConsoleLogger } from './console'
 import { DiscordLogger } from './discord'
 import { OtelLogger } from './otel-logger'
+import { PinoLogger } from './pino-logger'
 
 type OptionsNotifications = 'console' | 'discord' | 'otel'
 
@@ -34,13 +34,13 @@ export class Logger {
   ) {
     switch (provider) {
       case 'console':
-        return ConsoleLogger
+        return PinoLogger
       case 'discord':
         return DiscordLogger
       case 'otel':
         return env.OTEL_ENABLE === false ? DiscordLogger : OtelLogger
       default:
-        return ConsoleLogger
+        return PinoLogger
     }
   }
 }
